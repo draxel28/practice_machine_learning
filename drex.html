@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Identity Scanner</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap">
+<style>
+:root{--c:#00E5FF;--c2:#7C4DFF;--ok:#39FF88;--warn:#FF5D73;--bg:#050B18;--panel:rgba(8,22,44,.72);--dim:#6FA3B8}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:
+  radial-gradient(circle at 50% 0%,rgba(0,229,255,.16),transparent 55%),
+  linear-gradient(rgba(0,229,255,.06) 1px,transparent 1px) 0 0/40px 40px,
+  linear-gradient(90deg,rgba(0,229,255,.06) 1px,transparent 1px) 0 0/40px 40px,var(--bg);
+  color:var(--c);font-family:'Orbitron','Courier New',monospace;padding:20px 16px 40px}
+.wrap{max-width:900px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid rgba(0,229,255,.35);padding-bottom:12px;margin-bottom:18px}
+h1{font-size:clamp(18px,3.4vw,28px);letter-spacing:.2em;margin:0;font-weight:800;text-shadow:0 0 14px rgba(0,229,255,.7)}
+.status{font-size:13px;letter-spacing:.18em;color:var(--dim);display:flex;align-items:center;gap:8px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--dim);box-shadow:0 0 8px currentColor}
+.status.scan{color:var(--c)}.status.scan .dot{background:var(--c);animation:blink 1s infinite}
+.status.ok{color:var(--ok)}.status.ok .dot{background:var(--ok)}
+.status.err{color:var(--warn)}.status.err .dot{background:var(--warn)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid rgba(0,229,255,.35);border-radius:6px;padding:16px;backdrop-filter:blur(4px);box-shadow:0 0 24px rgba(0,229,255,.08) inset}
+.tag{font-size:11px;letter-spacing:.25em;color:var(--dim);margin:0 0 12px}
+.frame{position:relative;aspect-ratio:1/1;background:#02060f;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#webcam-container{width:100%;height:100%}
+#webcam-container canvas{display:block;width:100%!important;height:100%!important;object-fit:cover;filter:saturate(.8) contrast(1.1) hue-rotate(-8deg)}
+.idle{position:absolute;color:var(--dim);font-size:12px;letter-spacing:.3em;text-align:center}
+.frame.live .idle{display:none}
+.frame.live::after{content:"";position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--c),transparent);box-shadow:0 0 18px var(--c);animation:sweep 2.6s linear infinite}
+.br{position:absolute;width:26px;height:26px;border:3px solid var(--c);filter:drop-shadow(0 0 4px var(--c));z-index:2}
+.br.tl{top:8px;left:8px;border-right:0;border-bottom:0}.br.tr{top:8px;right:8px;border-left:0;border-bottom:0}
+.br.bl{bottom:8px;left:8px;border-right:0;border-top:0}.br.brr{bottom:8px;right:8px;border-left:0;border-top:0}
+button{width:100%;margin-top:14px;font:inherit;font-weight:600;letter-spacing:.3em;color:var(--c);background:transparent;border:1px solid var(--c);border-radius:4px;padding:12px;cursor:pointer;text-transform:uppercase;transition:.2s}
+button:hover:not(:disabled){background:rgba(0,229,255,.15);box-shadow:0 0 18px rgba(0,229,255,.5)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:2px solid var(--c2);outline-offset:3px}
+.greet{min-height:112px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px dashed rgba(111,163,184,.5);border-radius:4px;padding:14px;font-size:clamp(16px,3vw,24px);font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:18px;transition:.3s}
+.greet.on{color:var(--ok);border:1px solid var(--ok);text-shadow:0 0 14px var(--ok);box-shadow:0 0 28px rgba(57,255,136,.35),inset 0 0 22px rgba(57,255,136,.12);animation:pulse 1.6s infinite}
+.row{margin:0 0 14px}
+.row .top{display:flex;justify-content:space-between;font-size:12px;letter-spacing:.14em;margin-bottom:6px}
+.bar{height:10px;background:rgba(0,229,255,.12);border-radius:2px;overflow:hidden}
+.fill{height:100%;width:0;background:linear-gradient(90deg,var(--c2),var(--c));box-shadow:0 0 10px var(--c);transition:width .12s}
+.row.lead .fill{background:linear-gradient(90deg,var(--c),var(--ok))}
+.row.lead .top{color:#fff}
+@keyframes sweep{from{top:-4px}to{top:100%}}
+@keyframes blink{50%{opacity:.25}}
+@keyframes pulse{50%{box-shadow:0 0 44px rgba(57,255,136,.6),inset 0 0 30px rgba(57,255,136,.2)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>IDENTITY SCANNER</h1>
+    <div class="status" id="status"><span class="dot"></span><span id="stxt">STANDBY</span></div>
+  </header>
+  <div class="grid">
+    <section class="panel">
+      <p class="tag">// OPTICAL FEED</p>
+      <div class="frame" id="frame">
+        <span class="br tl"></span><span class="br tr"></span><span class="br bl"></span><span class="br brr"></span>
+        <div class="idle">CAMERA OFFLINE</div>
+        <div id="webcam-container"></div>
+      </div>
+      <button type="button" id="start" onclick="init()">Initialize</button>
+    </section>
+    <section>
+      <div class="greet" id="greeting" aria-live="polite">AWAITING IDENTITY</div>
+      <div class="panel">
+        <p class="tag">// NEURAL ANALYSIS</p>
+        <div id="label-container"><div class="idle" style="position:static">NO DATA</div></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script type="text/javascript">
+    const URL = "https://teachablemachine.withgoogle.com/models/Cml4IxpnN/";
+
+    // Class name in Teachable Machine (lowercase here) -> what to say.
+    // The class names in your model must match these, capitals don't matter.
+    const GREETINGS = {
+        "drexel": () => getGreeting(),
+        "cat": () => "Hii cat"
+    };
+    const THRESHOLD = 0.8;        // how sure the model must be (0 to 1)
+    const COOLDOWN_MS = 10000;    // wait before it can speak again
+    const NAME = "master Drexel";
+
+    // Picks the greeting from the device's local clock
+    function getGreeting() {
+        const h = new Date().getHours();
+        let part;
+        if (h >= 5 && h < 12) part = "Good morning";
+        else if (h >= 12 && h < 17) part = "Good afternoon";
+        else part = "Good evening";   // 5 PM to 4:59 AM
+        return part + " " + NAME;
+    }
+
+    let model, webcam, labelContainer, maxPredictions;
+    let rows = [], lastSpoken = {}, seenKey = null;
+
+    function setStatus(text, mode) {
+        document.getElementById("stxt").textContent = text;
+        document.getElementById("status").className = "status " + (mode || "");
+    }
+
+    async function init() {
+        const btn = document.getElementById("start");
+        btn.disabled = true;
+        try {
+            setStatus("LOADING MODEL", "scan");
+            model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+            maxPredictions = model.getTotalClasses();
+
+            setStatus("REQUESTING CAMERA", "scan");
+            webcam = new tmImage.Webcam(320, 320, true);
+            await webcam.setup();
+            await webcam.play();
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            document.getElementById("frame").classList.add("live");
+
+            labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "";
+            const labels = model.getClassLabels();
+            for (let i = 0; i < maxPredictions; i++) {
+                const row = document.createElement("div");
+                row.className = "row";
+                row.innerHTML = '<div class="top"><span></span><span></span></div><div class="bar"><div class="fill"></div></div>';
+                row.querySelector(".top span").textContent = labels[i];
+                labelContainer.appendChild(row);
+                rows.push(row);
+            }
+
+            btn.textContent = "Scanning";
+            setStatus("SCANNING", "scan");
+            window.requestAnimationFrame(loop);
+        } catch (err) {
+            console.error(err);
+            setStatus("ERROR: CHECK CAMERA / MODEL LINK", "err");
+            btn.disabled = false;
+        }
+    }
+
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    function speak(text) {
+        if (!("speechSynthesis" in window)) return;
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = "en-US";
+        window.speechSynthesis.speak(utter);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        let best = prediction[0];
+        for (let i = 1; i < maxPredictions; i++) {
+            if (prediction[i].probability > best.probability) best = prediction[i];
+        }
+
+        for (let i = 0; i < maxPredictions; i++) {
+            const pct = Math.round(prediction[i].probability * 100);
+            rows[i].querySelectorAll(".top span")[1].textContent = pct + "%";
+            rows[i].querySelector(".fill").style.width = pct + "%";
+            rows[i].classList.toggle("lead", prediction[i] === best);
+        }
+
+        const greeting = document.getElementById("greeting");
+        const key = best.className.trim().toLowerCase();
+        const makeText = best.probability >= THRESHOLD ? GREETINGS[key] : null;
+
+        if (makeText) {
+            const text = makeText();
+            greeting.textContent = text;
+            greeting.classList.add("on");
+            setStatus("SUBJECT DETECTED", "ok");
+            const now = Date.now();
+            // Speak when a new subject appears, once per cooldown for each subject
+            if (seenKey !== key && now - (lastSpoken[key] || 0) > COOLDOWN_MS) {
+                speak(text);
+                lastSpoken[key] = now;
+            }
+            seenKey = key;
+        } else {
+            greeting.textContent = "AWAITING IDENTITY";
+            greeting.classList.remove("on");
+            setStatus("SCANNING", "scan");
+            seenKey = null;
+        }
+    }
+</script>
+</body>
+</html>
